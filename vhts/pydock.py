@@ -117,6 +117,27 @@ class DockingVina(object):
                 smi_p = smi0
         return smi_p
 
+    def fix_ligand_atom_idx(self, line_list):
+        line_out_list = list()
+
+        atom_dict = dict()
+        total_line_out = str()
+
+        for line in line_list:
+            if line[0:6] == 'HETATM':
+                atom = line[12:16]
+                at = atom[0:2]
+                if at not in atom_dict:
+                   atom_dict[at] = 0
+               atom_dict[at] += 1
+               idx = atom_dict[at]
+               line_out = line[0:12] + '%s%-2d' % (at, idx) + line[16:]
+            else:
+                line_out = line
+            total_line_out += line_out
+
+        return total_line_out
+
     def gen_3d(self, smi, ligand_file):
         """
             generate initial 3d conformation from SMILES
@@ -124,19 +145,29 @@ class DockingVina(object):
                 SMILES string
                 ligand_file (output file, pdb)
         """
-        run_line = 'obabel -:%s --gen3D -O %s' % (smi, ligand_file)
+        run_line = 'obabel -:%s --gen3D -opdb' % (smi)
         e = None
         try:
-            result = subprocess.check_output(run_line.split(),
-                                             stderr=subprocess.STDOUT,
-                                             timeout=self.timeout_gen3d,
-                                             universal_newlines=True)
-            result_lines = result.split('\n')
-            for i, line in enumerate(result_lines):
+#            result = subprocess.check_output(run_line.split(),
+#                                             stderr=subprocess.STDOUT,
+#                                             timeout=self.timeout_gen3d,
+#                                             universal_newlines=True)
+            result = subprocess.run(run_line.split(), capture_output=True,
+                    check=True, universal_newlines=True)
+            #result.returncode
+            err_lines = result.stderr.split('\n')
+            for i, line in enumerate(err_lines):
                 idx = line.find('Error')
                 if idx != -1:
-                    e = result_lines[i] + result_lines[i+1]
+                    e = err_lines[i] + err_lines[i+1]
                     return e
+
+            result_lines = result.stdout.strip('\n').split('\n')
+            total_line_out = fix_ligand_atom_idx(result_lines)
+            fp=open(ligand_file, 'w')
+            fp.write(total_line_out)
+            fp.close()
+            
 
         except Exception as e:
             return e
