@@ -1,0 +1,11 @@
+chanels:
+    - conda-forge 
+    - bioconda
+    - anaconda
+    - rdkit
+dependencies:
+    filelock
+    openbabel >=3.1.0
+    smina
+    rdkit >=2020
+    pandas

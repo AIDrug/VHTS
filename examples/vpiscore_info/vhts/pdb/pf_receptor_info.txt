@@ -1,0 +1,4 @@
+feature_type:atom_idx_group:pattern_idx:pseudo_atom_coor:atom_type:etc:chain_id:residue_name:residue_num
+HBD:(1301):5:(10.874,36.413,95.133):O3:1306=(11.099,37.476,94.665): :THR:790
+Cation:(670):0:(21.068,34.642,94.824):N3+:: :LYS:745
+Aromatic:(2377,2378,2382,2386,2384,2380):2:(15.948,43.868,97.436):Car:(-0.179,0.971,-0.157): :PHE:856

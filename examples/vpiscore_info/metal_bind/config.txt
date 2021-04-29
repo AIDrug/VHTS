@@ -1,0 +1,11 @@
+receptor=pdb/2G1MA_receptor.pdbqt
+center_x=42.717
+center_y=22.278
+center_z=8.944
+size_x=24.128
+size_y=26.578
+size_z=17.765
+exhaustiveness=1
+custom_scoring=custom_scoring.txt
+cpu=1
+num_modes=10

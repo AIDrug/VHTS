@@ -1,0 +1,11 @@
+--work_dir=workflow
+--field_separator=\s+
+--smi_file_forma=txt
+--num_sample=1000
+--sampling_method=sequential
+--file_size=100
+--mlsync=0
+--sleep_cycle=60
+--auto_sub=shell
+--sub_dock_script=run_sub_dock.sh
+--num_sub=2

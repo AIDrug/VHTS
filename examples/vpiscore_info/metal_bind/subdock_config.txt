@@ -1,0 +1,12 @@
+--vina_program=smina
+--dock_config=config.txt
+--smi_file_format=pkl
+--timeout_gen3d=10
+--timeout_dock=240
+--gen3d_dir=tmp
+--dock_dir=tmp
+--tlen=4
+--neutralize
+--pH=7.4
+--pf_receptor=pdb/pf_receptor.txt
+--pf_receptor_info=pdb/pf_receptor_info.txt

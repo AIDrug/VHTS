@@ -1,0 +1,10 @@
+receptor=pdb/2OH4A_receptor.pdb
+center_x=40.159
+center_y=30.550
+center_z=14.975
+size_x=21.973
+size_y=36.475
+size_z=22.572
+exhaustiveness=1
+cpu=1
+num_modes=10

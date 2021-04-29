@@ -1,0 +1,2 @@
+--autobox_file=pdb/2OH4A_GIG.pdb 
+--autobox_file=pdb/2P2IA_608.pdb

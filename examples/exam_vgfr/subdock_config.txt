@@ -1,0 +1,8 @@
+--vina_program=qvina02
+--num_sub_proc=20
+--timeout_gen3d=3
+--timeout_dock=120
+--gen3d_dir=tmp
+--dock_dir=tmp
+--neutralize
+--pH=7.4

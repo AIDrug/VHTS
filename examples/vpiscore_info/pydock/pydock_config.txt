@@ -1,0 +1,17 @@
+--vina_program=qvina02
+--ligand_list_file=smiles_list.csv
+--dock_config=config.txt
+--output_file=docking.pkl
+--num_sub_proc=20
+--timeout_gen3d=3
+--timeout_dock=120
+--gen3d_dir=tmp
+--dock_dir=tmp
+--tlen=7
+--pout=100
+--neutralize
+--pH=7.4
+--piscore_receptor=pdb/receptor.pdb
+--pf_receptor=pdb/pf_receptor.txt
+--pinfo_ligand=pdb/crystal_ligand.pdb
+--pf_receptor_info=pdb/pf_receptor_info.txt  

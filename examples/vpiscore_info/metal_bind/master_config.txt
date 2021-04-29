@@ -1,0 +1,10 @@
+--work_dir=workflow
+--smi_file_format=pkl
+--num_sample=60000
+--sampling_method=sequential
+--file_size=1000
+--mlsync=0
+--sleep_cycle=60
+--auto_sub=shell
+--sub_dock_script=run_sub_dock.sh
+--num_sub=0

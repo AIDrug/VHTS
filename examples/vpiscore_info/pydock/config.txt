@@ -1,0 +1,10 @@
+receptor=pdb/receptor.pdbqt
+center_x=16.764
+center_y=35.706
+center_z=91.272
+size_x=17.619
+size_y=19.032
+size_z=22.828
+exhaustiveness=8
+cpu=1
+num_modes=10

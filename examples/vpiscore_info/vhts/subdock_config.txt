@@ -1,0 +1,15 @@
+--vina_program=qvina02
+--dock_config=config.txt
+--rescoring_program=smina
+--rescoring_config=config.txt
+--smi_file_format=pkl
+--timeout_gen3d=5
+--timeout_dock=240
+--output_save
+--gen3d_dir=gen3d
+--dock_dir=docking
+--tlen=7
+--piscore_receptor=pdb/receptor.pdb
+--pf_receptor=pdb/pf_receptor.txt
+--pinfo_ligand=pdb/crystal_ligand.pdb
+--pf_receptor_info=pdb/pf_receptor_info.txt  

@@ -1,0 +1,11 @@
+--vina_program=qvina02
+--ligand_list_file=smiles.txt
+--num_sub_proc=20
+--timeout_gen3d=3
+--timeout_dock=120
+--gen3d_dir=tmp
+--dock_dir=tmp
+--tlen=7
+--pout=100
+--neutralize
+--pH=7.4
