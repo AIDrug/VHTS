@@ -9,8 +9,8 @@ import subprocess
 from openbabel import pybel
 import argparse
 import pandas as pd
-from vhts import ligand_fixer
 from vhts import metal_bind
+from vhts import ligand_tools
 
 
 class DockingVina(object):
@@ -79,112 +79,6 @@ class DockingVina(object):
         self.rescoring = docking_params['rescoring']
         self.rescoring_program = docking_params['rescoring_program']
         self.rescoring_config_file = docking_params['rescoring_config_file']
-
-    def ligand_preperation(self, smi):
-        """
-            input smi
-                -> neutralize
-                -> protonate
-            output protonated smiles
-        """
-        neutralize = self.neutralize
-        pH = self.pH
-        if neutralize:
-            run_line = 'obabel -:%s -osmi --neutralize' % (smi)
-            result = subprocess.check_output(run_line.split(),
-                                             stderr=subprocess.STDOUT,
-                                             timeout=self.timeout_gen3d,
-                                             universal_newlines=True)
-            for line in result.split('\n'):
-                if line.startswith('1 molecule converted'):
-                    continue
-                if line.startswith('0 molecule converted'):
-                    smi0 = smi
-                    break
-                if len(line.strip()) < 1:
-                    continue
-                smi0 = line.strip()
-        else:
-            smi0 = smi
-        if pH is None:
-            smi_p = smi0
-        else:
-            try:
-                m = pybel.readstring("smi", smi0)
-                m.OBMol.AddHydrogens(False, True, pH)
-                smi_p = m.write("smi").strip()
-            except Exception:
-                smi_p = smi0
-        return smi_p
-
-    def fix_ligand_atom_idx(self, line_list):
-        line_out_list = list()
-
-        atom_dict = dict()
-        total_line_out = str()
-
-        for line in line_list:
-            if line[0:6] == 'HETATM':
-                atom = line[12:16]
-                at = atom[0:2]
-                if at not in atom_dict:
-                   atom_dict[at] = 0
-               atom_dict[at] += 1
-               idx = atom_dict[at]
-               line_out = line[0:12] + '%s%-2d' % (at, idx) + line[16:]
-            else:
-                line_out = line
-            total_line_out += line_out
-
-        return total_line_out
-
-    def gen_3d(self, smi, ligand_file):
-        """
-            generate initial 3d conformation from SMILES
-            input :
-                SMILES string
-                ligand_file (output file, pdb)
-        """
-        run_line = 'obabel -:%s --gen3D -opdb' % (smi)
-        e = None
-        try:
-#            result = subprocess.check_output(run_line.split(),
-#                                             stderr=subprocess.STDOUT,
-#                                             timeout=self.timeout_gen3d,
-#                                             universal_newlines=True)
-            result = subprocess.run(run_line.split(), capture_output=True,
-                    check=True, universal_newlines=True)
-            #result.returncode
-            err_lines = result.stderr.split('\n')
-            for i, line in enumerate(err_lines):
-                idx = line.find('Error')
-                if idx != -1:
-                    e = err_lines[i] + err_lines[i+1]
-                    return e
-
-            result_lines = result.stdout.strip('\n').split('\n')
-            total_line_out = fix_ligand_atom_idx(result_lines)
-            fp=open(ligand_file, 'w')
-            fp.write(total_line_out)
-            fp.close()
-            
-
-        except Exception as e:
-            return e
-        return e
-
-    def pdb_to_pdbqt(self, pdb_file, pdbqt_file):
-
-        run_line = 'prepare_ligand4.py -l %s -o %s' % (pdb_file, pdbqt_file)
-        run_line += ' -U nphs_lps'
-        e = None
-        try:
-            result = subprocess.check_output(run_line.split(),
-                                             stderr=subprocess.STDOUT,
-                                             universal_newlines=True)
-        except Exception as e:
-            return e
-        return e
 
     def docking(self, ligand_file, docking_pdbqt_file, docking_log_file):
         """
@@ -283,18 +177,6 @@ class DockingVina(object):
             return [99.999], e
         return affinity_list, e
 
-    def pdbqt_to_pdb(self, input_pdbqt_file, output_pdb_file):
-        run_line = 'obabel %s -O %s' % (input_pdbqt_file, output_pdb_file)
-        result = subprocess.check_output(run_line.split(),
-                                         stderr=subprocess.STDOUT,
-                                         universal_newlines=True)
-        ligand_fixer.fix_ligand_pdb(output_pdb_file, output_pdb_file)
-        run_line = 'obabel %s -h -O %s' % (output_pdb_file, output_pdb_file)
-        result = subprocess.check_output(run_line.split(),
-                                         stderr=subprocess.STDOUT,
-                                         universal_newlines=True)
-        return
-
     def creator(self, q, data, num_sub_proc):
         """
             put data to queue
@@ -313,7 +195,7 @@ class DockingVina(object):
 
         result_dict = dict()
         if self.neutralize or (self.pH is not None):
-            smi_p = self.ligand_preperation(smi)
+            smi_p = ligand_tools.ligand_preparation(smi, self.neutralize, self.pH)
         else:
             smi_p = smi
         if not self.output_save:
@@ -346,15 +228,15 @@ class DockingVina(object):
             docking_pdb_file = '%s/dock_%s.pdb' % (out_dock_dir1, mol_id)
             docking_log_file = '%s/dock_%s.log' % (out_dock_dir1, mol_id)
 
-        e = self.gen_3d(smi_p, ligand_pdb_file)
+        e = ligand_tools.gen_3d(smi_p, ligand_pdb_file)
         if e is not None:
-            e2 = self.gen_3d(smi_p, ligand_pdb_file)
+            e2 = ligand_tools.gen_3d(smi_p, ligand_pdb_file)
             if e2 is not None:
                 print(e2, 'gen_3d', idx, mol_id, smi_p, flush=True)
                 docking_score = np.array([99.999], dtype=np.float32)
                 result_dict['docking'] = docking_score
                 return result_dict
-        e = self.pdb_to_pdbqt(ligand_pdb_file, ligand_pdbqt_file)
+        e = ligand_tools.pdb_to_pdbqt(ligand_pdb_file, ligand_pdbqt_file)
         if e is not None:
             print(e, 'pdb_to_pdbqt', idx, mol_id, smi_p, flush=True)
             docking_score = np.array([99.999], dtype=np.float32)
@@ -370,8 +252,9 @@ class DockingVina(object):
             print(e, 'docking', idx, mol_id, smi_p, flush=True)
             return result_dict
         result_dict['docking'] = docking_score
-        if self.check_metal_bind or self.rescoring or self.use_my_module:
-            self.pdbqt_to_pdb(docking_pdbqt_file, docking_pdb_file)
+        if self.output_save or self.check_metal_bind or self.rescoring or self.use_my_module:
+            ligand_tools.pdbqt_to_pdb_ref(
+                docking_pdbqt_file, docking_pdb_file, ligand_pdb_file)
 
         if self.rescoring:
             docking_rescore, e = self.docking_score_only(docking_pdb_file)

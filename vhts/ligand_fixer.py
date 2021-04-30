@@ -194,6 +194,18 @@ def fix_ligand_pdb(ligand_input_file, ligand_fix_file):
     fp_p.close()
 
 
+def pdbqt_to_pdb(input_pdbqt_file, output_pdb_file):
+    run_line = 'obabel %s -O %s' % (input_pdbqt_file, output_pdb_file)
+    result = subprocess.check_output(run_line.split(),
+                                     stderr=subprocess.STDOUT,
+                                     universal_newlines=True)
+    fix_ligand_pdb(output_pdb_file, output_pdb_file)
+    run_line = 'obabel %s -h -O %s' % (output_pdb_file, output_pdb_file)
+    result = subprocess.check_output(run_line.split(),
+                                     stderr=subprocess.STDOUT,
+                                     universal_newlines=True)
+    return
+
 def main():
 
     import argparse
