@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from openbabel import pybel
 import subprocess
 
 
@@ -39,6 +40,23 @@ def ligand_preparation(smi, neutralize, pH):
     return smi_p
 
 
+def check_gen3d(line_list):
+    count_0 = 0
+    check_error = False
+    for line in line_list:
+        if line[0:6] == 'HETATM' or line[0:6] == 'ATOM  ':
+            x = float(line[30:38])
+            y = float(line[38:46])
+            z = float(line[46:54])
+            if x == 0.0 and y == 0.0 and z == 0.0:
+                count_0 += 1
+            if count_0 >= 2:
+                check_error = True
+                break
+
+    return check_error
+
+
 def fix_ligand_atom_idx(line_list):
 
     atom_dict = dict()
@@ -55,11 +73,12 @@ def fix_ligand_atom_idx(line_list):
             line_out = line[0:12] + '%s%-2d' % (at, idx) + line[16:]
         else:
             line_out = line
-        total_line_out += line_out+ '\n'
+        total_line_out += line_out + '\n'
 
     return total_line_out
 
-def gen_3d(smi, ligand_file):
+
+def gen_3d(smi, ligand_file, timeout=10):
     """
         generate initial 3d conformation from SMILES
         input :
@@ -70,8 +89,9 @@ def gen_3d(smi, ligand_file):
     e = None
     try:
         result = subprocess.run(run_line.split(), capture_output=True,
-                check=True, universal_newlines=True)
-        #result.returncode
+                                check=True, universal_newlines=True,
+                                timeout=timeout)
+        # result.returncode
         err_lines = result.stderr.split('\n')
         for i, line in enumerate(err_lines):
             idx = line.find('Error')
@@ -80,14 +100,19 @@ def gen_3d(smi, ligand_file):
                 return e
 
         result_lines = result.stdout.strip('\n').split('\n')
+        check_error = check_gen3d(result_lines)
+        if check_error:
+            e = 'error: gen 3d, two or more (0,0,0)'
+            return e
         total_line_out = fix_ligand_atom_idx(result_lines)
-        fp=open(ligand_file, 'w')
+        fp = open(ligand_file, 'w')
         fp.write(total_line_out)
         fp.close()
 
     except Exception as e:
         return e
     return e
+
 
 def pdb_to_pdbqt(pdb_file, pdbqt_file):
 
@@ -101,6 +126,7 @@ def pdb_to_pdbqt(pdb_file, pdbqt_file):
     except Exception as e:
         return e
     return e
+
 
 def read_ref_pdb_ligand(pdb_file):
     fp = open(pdb_file)
@@ -171,7 +197,8 @@ def write_pdb_one_ref(model, ref_atom_dict, ref_conect_dict):
         if atom_name in coor_dict:
 
             total_atom_list += [atom_num]
-            line_out = '%s%s%s' %(atom_line[:30], coor_dict[atom_name], atom_line[54:])
+            line_out = '%s%s%s' % (
+                atom_line[:30], coor_dict[atom_name], atom_line[54:])
             total_line_out += line_out
 
     keys = ref_conect_dict.keys()

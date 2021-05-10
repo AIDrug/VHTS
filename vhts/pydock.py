@@ -228,9 +228,11 @@ class DockingVina(object):
             docking_pdb_file = '%s/dock_%s.pdb' % (out_dock_dir1, mol_id)
             docking_log_file = '%s/dock_%s.log' % (out_dock_dir1, mol_id)
 
-        e = ligand_tools.gen_3d(smi_p, ligand_pdb_file)
+        e = ligand_tools.gen_3d(smi_p, ligand_pdb_file,
+                                timeout=self.timeout_gen3d)
         if e is not None:
-            e2 = ligand_tools.gen_3d(smi_p, ligand_pdb_file)
+            e2 = ligand_tools.gen_3d(smi_p, ligand_pdb_file,
+                                     timeout=self.timeout_gen3d)
             if e2 is not None:
                 print(e2, 'gen_3d', idx, mol_id, smi_p, flush=True)
                 docking_score = np.array([99.999], dtype=np.float32)
