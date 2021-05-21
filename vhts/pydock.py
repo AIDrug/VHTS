@@ -6,11 +6,9 @@ from multiprocessing import Manager
 from multiprocessing import Process
 from multiprocessing import Queue
 import subprocess
-from openbabel import pybel
 import argparse
 import pandas as pd
-from vhts import metal_bind
-from vhts import ligand_tools
+from pdbtools import ligand_tools
 
 
 class DockingVina(object):
@@ -72,10 +70,6 @@ class DockingVina(object):
             self.my_class = my_module.my_class
             self.my_class.__init__(self, docking_params)
 
-        self.check_metal_bind = docking_params['check_metal_bind']
-        if self.check_metal_bind:
-            self.metal_coor = docking_params['metal_coor']
-            self.metal_bind_cutoff = docking_params['metal_bind_cutoff']
         self.rescoring = docking_params['rescoring']
         self.rescoring_program = docking_params['rescoring_program']
         self.rescoring_config_file = docking_params['rescoring_config_file']
@@ -195,7 +189,8 @@ class DockingVina(object):
 
         result_dict = dict()
         if self.neutralize or (self.pH is not None):
-            smi_p = ligand_tools.ligand_preparation(smi, self.neutralize, self.pH)
+            smi_p = ligand_tools.ligand_preparation(smi, self.neutralize,
+                                                    self.pH)
         else:
             smi_p = smi
         if not self.output_save:
@@ -254,7 +249,7 @@ class DockingVina(object):
             print(e, 'docking', idx, mol_id, smi_p, flush=True)
             return result_dict
         result_dict['docking'] = docking_score
-        if self.output_save or self.check_metal_bind or self.rescoring or self.use_my_module:
+        if self.output_save or self.rescoring or self.use_my_module:
             ligand_tools.pdbqt_to_pdb_ref(
                 docking_pdbqt_file, docking_pdb_file, ligand_pdb_file)
 
@@ -267,21 +262,9 @@ class DockingVina(object):
             result_dict['docking_re'] = docking_rescore
 
         if self.use_my_module:
-            self.my_class.simulation_process(self, idx, mol_id, smi, smi_p, pid,
-                                             out_dock_dir1, docking_pdb_file,
-                                             result_dict)
-
-        if self.check_metal_bind:
-            try:
-                result = metal_bind.find_neighbor_metal(
-                    docking_pdb_file, self.metal_coor,
-                    dist_cutoff=self.metal_bind_cutoff,
-                    skip_neighbor_hydrogen=True)
-                num_metal_bind_atom_list = np.array(result, dtype=np.float32)
-            except Exception as e:
-                num_metal_bind_atom_list = np.array([0], dtype=np.float32)
-                print(e, 'check metal bind', idx, mol_id, smi_p, flush=True)
-            result_dict['num_metal_bind_atom'] = num_metal_bind_atom_list
+            self.my_class.simulation_process(self, idx, mol_id, smi, smi_p,
+                                             pid, out_dock_dir1,
+                                             docking_pdb_file, result_dict)
 
         return result_dict
 
@@ -344,8 +327,6 @@ class DockingVina(object):
 
         result_dict = dict()
         docking_score_list = list()
-        if self.check_metal_bind:
-            num_metal_bind_atom_list = list()
         if self.rescoring:
             docking_re_list = list()
 
@@ -357,11 +338,6 @@ class DockingVina(object):
                 else:
                     docking_score = np.array([99.999], dtype=np.float32)
 
-                if self.check_metal_bind:
-                    if 'num_metal_bind_atom' in result_dict0:
-                        num_metal_bind_atom = result_dict0['num_metal_bind_atom']
-                    else:
-                        num_metal_bind_atom = np.array([0], dtype=np.float32)
                 if self.rescoring:
                     if 'docking_re' in result_dict0:
                         docking_re = result_dict0['docking_re']
@@ -370,20 +346,14 @@ class DockingVina(object):
 
             else:
                 docking_score = np.array([99.999], dtype=np.float32)
-                if self.check_metal_bind:
-                    num_metal_bind_atom = np.array([0], dtype=np.float32)
                 if self.rescoring:
                     docking_re = np.array([99.999], dtype=np.float32)
 
             docking_score_list += [docking_score]
-            if self.check_metal_bind:
-                num_metal_bind_atom_list += [num_metal_bind_atom]
             if self.rescoring:
                 docking_re_list += [docking_re]
 
         result_dict['docking'] = docking_score_list
-        if self.check_metal_bind:
-            result_dict['num_metal_bind_atom'] = num_metal_bind_atom_list
         if self.rescoring:
             result_dict['docking_re'] = docking_re_list
 
@@ -391,46 +361,6 @@ class DockingVina(object):
             self.my_class.predict(self, smiles_list, result_dict, return_dict)
 
         return result_dict
-
-
-def cal_box_size(ligand_file_list, margin=4.0, use_hydrogen=False):
-    """
-        cal box size from ligands
-        input:
-            ligand file list
-            margin: addtional box-size to ligand size, default 3.0
-            use_hydrogen: include hydrogen atom position, defalut Flase
-        output:
-            box_center : tuple (x, y, z)
-            box_size : tuple (wx, wy, wz)
-    """
-    cmins = list()
-    cmaxs = list()
-    for ligand_file in ligand_file_list:
-        file_format = ligand_file.split(".")[-1]
-        ms = list(pybel.readfile(file_format, ligand_file))
-        m = ms[0]
-        if not use_hydrogen:
-            m.removeh()
-        atoms = m.atoms
-        coor_list = list()
-        for atom in atoms:
-            coor_list.append(atom.coords)
-        coor = np.array(coor_list)
-
-        cmin0 = coor.min(axis=0)
-        cmax0 = coor.max(axis=0)
-        cmins.append(cmin0)
-        cmaxs.append(cmax0)
-    cmins = np.array(cmins)
-    cmaxs = np.array(cmaxs)
-    cmin = cmins.min(axis=0)
-    cmax = cmaxs.max(axis=0)
-
-    box_center = tuple((cmax+cmin)/2.0)
-    box_size = tuple((cmax-cmin) + margin*2)
-
-    return box_center, box_size
 
 
 class LoadFromConfig(argparse.Action):
@@ -481,12 +411,6 @@ def parser_arg(parser):
                         help='lenth of sub directory name, default: 7')
     parser.add_argument('--pout', type=int, default='0', required=False,
                         help='print processing out: 0 or number, default: 0')
-    parser.add_argument('--metal_coor', type=str, default=None, required=False,
-                        help='position of metal_ion,' +
-                        ' example: --metal_coor="1.0,-1.0,0.0" default: None')
-    parser.add_argument('--metal_cutoff', type=float, required=False,
-                        default=3.0,
-                        help='metal ion - HDA cutoff distance,')
     parser.add_argument('--rescoring_program', type=str, required=False,
                         default='smina', help='smina path')
     parser.add_argument('--rescoring_config', type=str, required=False,
@@ -523,16 +447,6 @@ def arg_to_params(parser):
     neutralize = args.neutralize
     pH = args.pH
 
-    check_metal_bind = False
-    if args.metal_coor is not None:
-        check_metal_bind = True
-        metal_coor = np.array(args.metal_coor.strip(
-            '"').split(','), dtype=np.float32)
-        if metal_coor.shape[0] != 3:
-            print('metal coordinate is strange', args.metal_coor)
-            sys.exit()
-        metal_bind_cutoff = args.metal_cutoff
-
     rescoring = False
     rescoring_config_file = args.rescoring_config
     rescoring_program = args.rescoring_program
@@ -552,10 +466,6 @@ def arg_to_params(parser):
     docking_params['neutralize'] = neutralize
     docking_params['pH'] = pH
     docking_params['dock_config_file'] = dock_config_file
-    docking_params['check_metal_bind'] = check_metal_bind
-    if args.metal_coor is not None:
-        docking_params['metal_coor'] = metal_coor
-        docking_params['metal_bind_cutoff'] = metal_bind_cutoff
     docking_params['rescoring'] = rescoring
     docking_params['rescoring_program'] = rescoring_program
     docking_params['rescoring_config_file'] = rescoring_config_file
@@ -623,9 +533,6 @@ def main():
     docking_min = [x[0] for x in docking_score_list]
     df['Docking1'] = docking_min
     df['Docking'] = docking_score_list
-    if docking_params['check_metal_bind']:
-        num_metal_bind_atom_list = result_dict['num_metal_bind_atom']
-        df['Metal_bind'] = num_metal_bind_atom_list
     if docking_params['rescoring']:
         rescoring = result_dict['docking_re']
         df['Docking_re'] = rescoring

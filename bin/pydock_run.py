@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import sys
 import os
-import numpy as np
 import argparse
 import vhts.pydock as pydock
 import pandas as pd
@@ -55,12 +54,6 @@ def parser_arg(parser):
                         help='lenth of sub directory name, default: 7')
     parser.add_argument('--pout', type=int, default='0', required=False,
                         help='print processing out: 0 or number, default: 0')
-    parser.add_argument('--metal_coor', type=str, default=None, required=False,
-                        help='position of metal_ion,' +
-                        ' example: --metal_coor="1.0,-1.0,0.0" default: None')
-    parser.add_argument('--metal_cutoff', type=float, required=False,
-                        default=3.0,
-                        help='metal ion - HDA cutoff distance,')
     parser.add_argument('--rescoring_program', type=str, required=False,
                         default='smina', help='smina path')
     parser.add_argument('--rescoring_config', type=str, required=False,
@@ -97,16 +90,6 @@ def arg_to_params(parser):
     neutralize = args.neutralize
     pH = args.pH
 
-    check_metal_bind = False
-    if args.metal_coor is not None:
-        check_metal_bind = True
-        metal_coor = np.array(args.metal_coor.strip(
-            '"').split(','), dtype=np.float32)
-        if metal_coor.shape[0] != 3:
-            print('metal coordinate is strange', args.metal_coor)
-            sys.exit()
-        metal_bind_cutoff = args.metal_cutoff
-
     rescoring = False
     rescoring_config_file = args.rescoring_config
     rescoring_program = args.rescoring_program
@@ -126,10 +109,6 @@ def arg_to_params(parser):
     docking_params['neutralize'] = neutralize
     docking_params['pH'] = pH
     docking_params['dock_config_file'] = dock_config_file
-    docking_params['check_metal_bind'] = check_metal_bind
-    if args.metal_coor is not None:
-        docking_params['metal_coor'] = metal_coor
-        docking_params['metal_bind_cutoff'] = metal_bind_cutoff
     docking_params['rescoring'] = rescoring
     docking_params['rescoring_program'] = rescoring_program
     docking_params['rescoring_config_file'] = rescoring_config_file
@@ -197,9 +176,6 @@ def main():
     docking_min = [x[0] for x in docking_score_list]
     df['Docking1'] = docking_min
     df['Docking'] = docking_score_list
-    if docking_params['check_metal_bind']:
-        num_metal_bind_atom_list = result_dict['num_metal_bind_atom']
-        df['Metal_bind'] = num_metal_bind_atom_list
     if docking_params['rescoring']:
         rescoring = result_dict['docking_re']
         df['Docking_re'] = rescoring
