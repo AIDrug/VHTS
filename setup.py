@@ -10,9 +10,9 @@ setup(name='VHTS',
         author_email='gicsaw0@gmail.com',
         description='',
         scripts=['bin/master_dock.py',
-                 'pydock_run.py',
-                 'sub_dock.py',
-                 'vhts_check_restart.py'
+                 'bin/pydock_run.py',
+                 'bin/sub_dock.py',
+                 'bin/vhts_check_restart.py'
                 ]
 )
 
