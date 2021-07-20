@@ -9,6 +9,7 @@ import subprocess
 import argparse
 import pandas as pd
 from pdbtools import ligand_tools
+from vhts import sdtether
 
 
 class Docking(object):
@@ -71,6 +72,30 @@ class Docking(object):
         self.rescoring = docking_params['rescoring']
         self.rescoring_program = docking_params['rescoring_program']
         self.rescoring_config_file = docking_params['rescoring_config_file']
+
+        self.tether_SMARTS = docking_params['tether_SMARTS']
+        self.tether_ref_lig = docking_params['tether_ref_lig']
+        self.tether_ref_coor_file = docking_params['tether_ref_coor_file']
+
+        self.tether_docking = False
+        if self.tether_SMARTS is not None:
+            if self.dp != 'rdock':
+                print('Tether scaffold docking is only supported by rdock.')
+                sys.exit()
+            self.smarts = sdtether.gen_smarts(self.tether_SMARTS)
+            self.ref_match_coords = list()
+            if self.tether_ref_coor_file is not None:
+                self.ref_match_coords = sdtether.read_tether_coords(
+                    self.tether_ref_coor_file)
+            elif self.tether_ref_lig is not None:
+                self.ref_match_coords = sdtether.find_tether_ref_coords(
+                    self.tether_ref_ligand, self.tether_SMARTS)
+
+            if len(self.ref_match_coords) >= 1:
+                self.tether_docking = True
+            else:
+                print('No reference matching coordinates.')
+                sys.exit()
 
     def docking_vina(self, ligand_file, docking_pdbqt_file, docking_log_file):
         """
@@ -183,11 +208,11 @@ class Docking(object):
         run_line = '%s' % self.docking_program
         run_line += ' -r %s' % self.dock_config_file
         run_line += ' -p dock.prm'
-        run_line += ' -n 10' % self.exhaustiveness
+        run_line += ' -n %d' % self.exhaustiveness
         run_line += ' -i %s' % ligand_file
         run_line += ' -o %s' % docking_prefix
 
-        run_line2 = "sdsort -n -f'SCORE' %s.sd" % (docking_prefix)
+        run_line2 = 'sdsort -n -fSCORE %s.sd' % (docking_prefix)
         e = None
         try:
             result = subprocess.check_output(run_line.split(),
@@ -195,13 +220,13 @@ class Docking(object):
                                              timeout=self.timeout_dock,
                                              universal_newlines=True)
             if self.output_save:
-                fp = open(docking_log_file)
+                fp = open(docking_log_file, 'w')
                 fp.write(result)
                 fp.close()
 
             result2 = subprocess.check_output(run_line2.split(),
                                               universal_newlines=True)
-            fp = open(docking_file)
+            fp = open(docking_file, 'w')
             fp.write(result2)
             fp.close()
 
@@ -280,13 +305,13 @@ class Docking(object):
             docking_pdbqt_file = '%s/dock_%s.pdbqt' % (out_dock_dir1, mol_id)
             docking_pdb_file = '%s/dock_%s.pdb' % (out_dock_dir1, mol_id)
             docking_log_file = '%s/dock_%s.log' % (out_dock_dir1, mol_id)
-            docking_sdf_file = '%s/dock_%s.pdb' % (out_dock_dir1, mol_id)
+            docking_sdf_file = '%s/dock_%s.sdf' % (out_dock_dir1, mol_id)
 
         if self.dp == 'vina':
-            e = ligand_tools.gen_3d(smi_p, ligand_pdb_file,
+            e = ligand_tools.gen_3d(smi_p, ligand_pdb_file, mol_id=mol_id,
                                     timeout=self.timeout_gen3d)
             if e is not None:
-                e2 = ligand_tools.gen_3d(smi_p, ligand_pdb_file,
+                e2 = ligand_tools.gen_3d(smi_p, ligand_pdb_file, mol_id=mol_id,
                                          timeout=self.timeout_gen3d)
                 if e2 is not None:
                     print(e2, 'gen_3d', idx, mol_id, smi_p, flush=True)
@@ -302,13 +327,21 @@ class Docking(object):
                 return result_dict
 
         elif self.dp == 'rdock':
-            e = ligand_tools.gen_3d(smi_p, ligand_sdf_file,
+            e = ligand_tools.gen_3d(smi_p, ligand_sdf_file, mol_id=mol_id,
                                     timeout=self.timeout_gen3d)
             if e is not None:
-                e2 = ligand_tools.gen_3d(smi_p, ligand_sdf_file,
+                e2 = ligand_tools.gen_3d(smi_p, ligand_sdf_file, mol_id=mol_id,
                                          timeout=self.timeout_gen3d)
                 if e2 is not None:
                     print(e2, 'gen_3d', idx, mol_id, smi_p, flush=True)
+                    docking_score = np.array([99.999], dtype=np.float32)
+                    result_dict['docking'] = docking_score
+                    return result_dict
+
+            if self.tether_docking:
+                e = sdtether.tether_ligand(ligand_sdf_file, self.smarts,
+                                           self.ref_match_coords)
+                if e is not None:
                     docking_score = np.array([99.999], dtype=np.float32)
                     result_dict['docking'] = docking_score
                     return result_dict
@@ -336,7 +369,7 @@ class Docking(object):
                                               ligand_pdb_file)
             elif self.dp == 'rdock':
                 ligand_tools.obabel_rewrite(docking_sdf_file,
-                                            docking_pdb_file, option=' -H')
+                                            docking_pdb_file, option=' -h')
 
         if self.rescoring:
             docking_rescore, e = self.docking_vina_score_only(docking_pdb_file)
@@ -501,6 +534,19 @@ def parser_arg(parser):
     parser.add_argument('--rescoring_config', type=str, required=False,
                         default=None, help='docking config file for rescoring')
 
+    parser.add_argument('--tether_ref_lig', type=str, required=False,
+                        default=None,
+                        help='reference ligand for tether docking')
+    parser.add_argument('--tether_SMARTS', type=str, required=False,
+                        default=None, help='SMARTS pattern for tether docking')
+    parser.add_argument('--tether_ref_coor_file', type=str, required=False,
+                        default=None,
+                        help='reference coordinate file for tether docking')
+
+    parser.add_argument('--exhaustiveness', type=int, required=False,
+                        default=10,
+                        help='exhaustiveness for rdock')
+
     return
 
 
@@ -532,6 +578,12 @@ def arg_to_params(parser):
     neutralize = args.neutralize
     pH = args.pH
 
+    tether_ref_lig = args.tether_ref_lig
+    tether_SMARTS = args.tether_SMARTS
+    tether_ref_coor_file = args.tether_ref_coor_file
+
+    exhaustiveness = args.exhaustiveness
+
     rescoring = False
     rescoring_config_file = args.rescoring_config
     rescoring_program = args.rescoring_program
@@ -554,6 +606,10 @@ def arg_to_params(parser):
     docking_params['rescoring'] = rescoring
     docking_params['rescoring_program'] = rescoring_program
     docking_params['rescoring_config_file'] = rescoring_config_file
+    docking_params['tether_ref_lig'] = tether_ref_lig
+    docking_params['tether_SMARTS'] = tether_SMARTS
+    docking_params['tether_ref_coor_file'] = tether_ref_coor_file
+    docking_params['exhaustiveness'] = exhaustiveness
 
     my_module_path = args.my_module
     docking_params['use_my_module'] = use_my_module
