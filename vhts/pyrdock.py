@@ -212,7 +212,9 @@ class Docking(object):
         run_line += ' -i %s' % ligand_file
         run_line += ' -o %s' % docking_prefix
 
-        run_line2 = 'sdsort -n -fSCORE %s.sd' % (docking_prefix)
+#        run_line2 = 'sdsort -n -fSCORE %s.sd' % (docking_prefix)
+        run_line2 = 'sdsort -n -fSCORE.INTER %s.sd' % (docking_prefix)
+
         e = None
         try:
             result = subprocess.check_output(run_line.split(),
@@ -237,7 +239,8 @@ class Docking(object):
         out_lines = result2.split('\n')
         check_score = False
         for line in out_lines:
-            if line[0:10] == '>  <SCORE>':
+            if line[0:16] == '>  <SCORE.INTER>':
+#            if line[0:10] == '>  <SCORE>':
                 check_score = True
                 continue
             if check_score is True:
